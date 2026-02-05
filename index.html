@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SantAI Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        :root { --sab: env(safe-area-inset-bottom); }
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; height: 100svh; overflow: hidden; margin: 0; }
+        .chat-area { height: calc(100svh - 64px - 90px); overflow-y: auto; }
+        .message-bubble { word-break: break-word; animation: slideUp 0.2s ease-out forwards; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Header -->
+    <header class="h-16 border-b border-white/10 flex items-center justify-between px-4 bg-black shrink-0">
+        <div class="flex items-center gap-2">
+            <div id="status-dot" class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"></div>
+            <span class="text-[10px] tracking-[0.4em] font-black text-white/30 uppercase">SANTAI PRO</span>
+        </div>
+        <button onclick="checkKey()" class="text-[10px] bg-white/10 px-3 py-1 rounded-full text-white/50">Probar Llave</button>
+    </header>
+
+    <!-- Chat -->
+    <div id="chat-container" class="flex-1 p-4 space-y-6 chat-area no-scrollbar">
+        <div id="log" class="text-[11px] font-mono text-yellow-500/50 p-4 border border-yellow-500/20 rounded-xl bg-yellow-500/5 hidden">
+            <!-- Aquí saldrán errores técnicos para ayudarte -->
+        </div>
+        <div id="empty-state" class="h-full flex flex-col items-center justify-center text-center opacity-30 py-20">
+            <p class="text-[10px] tracking-[0.3em] uppercase font-bold italic">Esperando conexión...</p>
+        </div>
+    </div>
+
+    <!-- Input -->
+    <div class="px-4 pb-[calc(10px+var(--sab))] pt-2 bg-black shrink-0">
+        <div class="max-w-3xl mx-auto flex items-center gap-2 bg-[#151515] border border-white/10 p-1.5 rounded-[26px]">
+            <input id="user-input" type="text" class="flex-1 bg-transparent py-3 px-4 outline-none text-[16px] text-white" placeholder="Escribe algo..." autocomplete="off">
+            <button onclick="handleSend()" class="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center active:scale-90 transition-all">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- PEGA TU LLAVE AQUÍ ---
+        const apiKey = "TU_LLAVE_AQUI"; 
+        // -------------------------
+
+        function addLog(txt) {
+            const l = document.getElementById('log');
+            l.classList.remove('hidden');
+            l.innerHTML += `<div>> ${txt}</div>`;
+        }
+
+        window.checkKey = async () => {
+            addLog("Probando llave...");
+            if(apiKey === "AIzaSyDV66VdHdk9KQZekL8fB8P8TB8EEjOXXTU") {
+                addLog("ERROR: No has pegado la llave real.");
+                return;
+            }
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: "hi"}]}]})
+                });
+                const d = await res.json();
+                if(d.error) {
+                    addLog(`ERROR DE GOOGLE: ${d.error.message}`);
+                    document.getElementById('status-dot').style.backgroundColor = "#ef4444";
+                } else {
+                    addLog("¡CONEXIÓN EXITOSA! El punto se pondrá verde.");
+                    document.getElementById('status-dot').style.backgroundColor = "#22c55e";
+                    document.getElementById('status-dot').style.boxShadow = "0 0 10px #22c55e";
+                }
+            } catch(e) {
+                addLog("Error de red. ¿Tienes internet?");
+            }
+        };
+
+        function addMessage(role, text) {
+            const c = document.getElementById('chat-container');
+            const e = document.getElementById('empty-state');
+            if(e) e.remove();
+            const w = document.createElement('div');
+            w.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-6 message-bubble`;
+            w.innerHTML = `<div class="${role === 'user' ? 'bg-white text-black p-4 rounded-3xl rounded-tr-none' : 'w-full text-white/90'} max-w-[88%] text-[16px]">${text}</div>`;
+            c.appendChild(w);
+            c.scrollTo({top: c.scrollHeight, behavior: 'smooth'});
+        }
+
+        window.handleSend = async () => {
+            const i = document.getElementById('user-input');
+            const v = i.value.trim();
+            if(!v) return;
+            i.value = '';
+            addMessage('user', v);
+            
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({contents: [{parts: [{text: v}]}]})
+                });
+                const d = await res.json();
+                if(d.candidates) addMessage('assistant', d.candidates[0].content.parts[0].text);
+                else addMessage('assistant', "Error. Pulsa el botón 'Probar Llave' arriba.");
+            } catch(e) {
+                addMessage('assistant', "Error de conexión.");
+            }
+        };
+
+        // Auto-prueba al cargar
+        window.onload = checkKey;
+    </script>
+</body>
+</html>
+
