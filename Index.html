@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA Unificada Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        .loader { border: 2px solid #334155; border-top: 2px solid #818cf8; border-radius: 50%; width: 18px; height: 18px; animation: spin 0.8s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Modal de API Key (Necesario para GitHub Pages) -->
+    <div id="apiKeyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
+            <h2 class="text-lg font-bold mb-2">Configuración Requerida</h2>
+            <p class="text-xs text-slate-400 mb-4">Para usar esto en GitHub Pages necesitas tu propia API Key de Google AI Studio.</p>
+            <input type="password" id="keyInput" placeholder="Introduce tu API Key" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm mb-4 focus:ring-2 focus:ring-indigo-500 outline-none">
+            <button onclick="saveKey()" class="w-full bg-indigo-600 hover:bg-indigo-500 p-3 rounded-lg font-bold text-sm transition-colors">Guardar y Empezar</button>
+            <p class="text-[10px] text-center mt-4 text-slate-500">La clave se guarda localmente en tu navegador.</p>
+        </div>
+    </div>
+
+    <div class="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[92vh]">
+        <!-- Header -->
+        <div class="p-5 bg-slate-800/40 border-b border-slate-800 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-white tracking-tight">Cerebro Único</h1>
+                    <button onclick="clearKey()" class="text-[10px] text-indigo-400 hover:underline">Cambiar API Key</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conversación -->
+        <div id="outputArea" class="flex-1 p-6 overflow-y-auto space-y-6 bg-slate-900 custom-scrollbar">
+            <div class="flex justify-start">
+                <div class="max-w-[85%] p-4 rounded-2xl bg-slate-800 border border-slate-700 rounded-tl-none text-slate-300 text-sm">
+                    Modo unificado listo. Escribe para chatear o pide "dibuja..." para crear arte.
+                </div>
+            </div>
+        </div>
+
+        <div id="actionIndicator" class="px-6 py-1 h-6 text-[10px] font-bold text-indigo-400 uppercase opacity-0 transition-opacity"></div>
+        <div id="errorMessage" class="hidden mx-6 mb-2 p-3 bg-red-900/20 border border-red-800/50 text-red-400 rounded-xl text-xs"></div>
+
+        <!-- Input -->
+        <div class="p-4 bg-slate-900 border-t border-slate-800/50">
+            <div class="relative flex items-end gap-3 bg-slate-800/80 border border-slate-700 rounded-2xl p-2.5 focus-within:border-indigo-500/50 transition-all">
+                <textarea id="userInput" rows="1" class="flex-1 bg-transparent p-2 text-slate-200 placeholder-slate-500 focus:outline-none resize-none text-sm max-h-40" placeholder="Pregunta algo o pide una imagen..."></textarea>
+                <button id="sendBtn" onclick="processInput()" class="bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-xl transition-all disabled:opacity-40">
+                    <svg id="sendIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                    <div id="btnLoader" class="loader hidden"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let API_KEY = localStorage.getItem('gemini_api_key') || "";
+
+        // Si ya hay key, ocultar modal
+        if (API_KEY) document.getElementById('apiKeyModal').classList.add('hidden');
+
+        function saveKey() {
+            const val = document.getElementById('keyInput').value.trim();
+            if (val) {
+                API_KEY = val;
+                localStorage.setItem('gemini_api_key', val);
+                document.getElementById('apiKeyModal').classList.add('hidden');
+            }
+        }
+
+        function clearKey() {
+            localStorage.removeItem('gemini_api_key');
+            location.reload();
+        }
+
+        const imageKeywords = ['dibuja', 'genera', 'crea', 'imagen', 'pinta', 'foto', 'ilustra', 'draw', 'generate', 'image', 'picture'];
+
+        async function fetchWithRetry(url, options, maxRetries = 3) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return await response.json();
+                    const errData = await response.json();
+                    throw new Error(errData.error?.message || "Error API");
+                } catch (err) {
+                    if (i === maxRetries - 1) throw err;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        function appendMessage(role, content, isImage = false) {
+            const outputArea = document.getElementById('outputArea');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`;
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-[85%] p-4 rounded-2xl text-sm shadow-xl ${role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-none'}`;
+            
+            if (isImage) {
+                const img = document.createElement('img');
+                img.src = content;
+                img.className = "rounded-xl w-full h-auto";
+                innerDiv.appendChild(img);
+            } else {
+                innerDiv.innerText = content;
+            }
+            msgDiv.appendChild(innerDiv);
+            outputArea.appendChild(msgDiv);
+            outputArea.scrollTop = outputArea.scrollHeight;
+        }
+
+        async function processInput() {
+            if (!API_KEY) return document.getElementById('apiKeyModal').classList.remove('hidden');
+
+            const inputEl = document.getElementById('userInput');
+            const prompt = inputEl.value.trim();
+            const btn = document.getElementById('sendBtn');
+            const loader = document.getElementById('btnLoader');
+            const icon = document.getElementById('sendIcon');
+            const errorEl = document.getElementById('errorMessage');
+            const indicator = document.getElementById('actionIndicator');
+
+            if (!prompt) return;
+
+            errorEl.classList.add('hidden');
+            inputEl.value = "";
+            appendMessage('user', prompt);
+            
+            btn.disabled = true;
+            icon.classList.add('hidden');
+            loader.classList.remove('hidden');
+
+            const isImageRequest = imageKeywords.some(k => prompt.toLowerCase().includes(k));
+            indicator.innerText = isImageRequest ? "Generando Imagen..." : "Pensando...";
+            indicator.style.opacity = "1";
+
+            try {
+                if (isImageRequest) {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${API_KEY}`;
+                    const data = await fetchWithRetry(url, {
+                        method: 'POST',
+                        body: JSON.stringify({ instances: { prompt: prompt }, parameters: { sampleCount: 1 } })
+                    });
+                    appendMessage('ai', `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`, true);
+                } else {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+                    const data = await fetchWithRetry(url, {
+                        method: 'POST',
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    });
+                    appendMessage('ai', data.candidates[0].content.parts[0].text);
+                }
+            } catch (err) {
+                errorEl.innerText = "Error: " + err.message;
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('hidden');
+                loader.classList.add('hidden');
+                indicator.style.opacity = "0";
+            }
+        }
+
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); processInput(); }
+        });
+    </script>
+</body>
+</html>
+
